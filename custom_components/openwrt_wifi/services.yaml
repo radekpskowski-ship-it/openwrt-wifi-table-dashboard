@@ -1,11 +1,11 @@
 set_client_name:
   fields:
-    entry_id:
+    entry_id: &entry
       required: false
       selector:
         config_entry:
           integration: openwrt_wifi
-    mac:
+    mac: &mac
       required: true
       example: "24:9e:7d:d6:c5:be"
       selector:
@@ -13,5 +13,37 @@ set_client_name:
     name:
       required: false
       example: "Odkurzacz salon"
+      selector:
+        text:
+kick_client:
+  fields:
+    entry_id: *entry
+    mac: *mac
+    ban_seconds:
+      required: false
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 86400
+          unit_of_measurement: s
+          mode: box
+restart_wifi:
+  fields:
+    entry_id: *entry
+reboot:
+  fields:
+    entry_id: *entry
+set_channel:
+  fields:
+    entry_id: *entry
+    radio:
+      required: true
+      example: wlan0
+      selector:
+        text:
+    channel:
+      required: true
+      example: "6"
       selector:
         text:

@@ -101,6 +101,24 @@
       "radio_retry": {
         "name": "{radio} TX retries"
       }
+    },
+    "binary_sensor": {
+      "port": {
+        "name": "Port {port}"
+      }
+    },
+    "button": {
+      "restart_wifi": {
+        "name": "Restart Wi-Fi"
+      },
+      "reboot": {
+        "name": "Reboot router"
+      }
+    },
+    "select": {
+      "channel": {
+        "name": "{radio} channel"
+      }
     }
   },
   "services": {
@@ -110,7 +128,7 @@
       "fields": {
         "entry_id": {
           "name": "Router",
-          "description": "Integration entry; empty = all routers."
+          "description": "Integration entry; required with several routers."
         },
         "mac": {
           "name": "MAC",
@@ -119,6 +137,62 @@
         "name": {
           "name": "Name",
           "description": "New name (empty = automatic)."
+        }
+      }
+    },
+    "kick_client": {
+      "name": "Kick client",
+      "description": "Disconnects a Wi-Fi client (deauth), optionally banning it for a while.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Integration entry; required with several routers."
+        },
+        "mac": {
+          "name": "MAC",
+          "description": "Client MAC address."
+        },
+        "ban_seconds": {
+          "name": "Ban",
+          "description": "Seconds to block reconnection (0 = no ban)."
+        }
+      }
+    },
+    "restart_wifi": {
+      "name": "Restart Wi-Fi",
+      "description": "Turns router Wi-Fi off and on (wifi down/up).",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Integration entry; required with several routers."
+        }
+      }
+    },
+    "reboot": {
+      "name": "Reboot router",
+      "description": "Reboots the OpenWrt router.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Integration entry; required with several routers."
+        }
+      }
+    },
+    "set_channel": {
+      "name": "Set channel",
+      "description": "Stores the radio channel in /etc/config/wireless and reloads Wi-Fi.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Integration entry; required with several routers."
+        },
+        "radio": {
+          "name": "Radio",
+          "description": "Interface (e.g. wlan0) or uci section (e.g. radio0)."
+        },
+        "channel": {
+          "name": "Channel",
+          "description": "Channel number or auto."
         }
       }
     }

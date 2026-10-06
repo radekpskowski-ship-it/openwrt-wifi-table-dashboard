@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from datetime import timedelta
+import asyncio
 import logging
 import time
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import area_registry as ar, device_registry as dr, label_registry as lr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
@@ -48,19 +49,18 @@ class OpenWrtWifiCoordinator(DataUpdateCoordinator[dict]):
         self._store: Store[dict] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
         self._seen: dict = {}
         self._prev: dict = {}
-        self._board: dict | None = None
+        self._cache: dict = {}  # system.board + board.json (statyczne)
 
     async def _async_setup(self) -> None:
         self._seen = await self._store.async_load() or {}
 
     async def _async_update_data(self) -> dict:
         try:
-            raw = await collect(self.client, self.mikrotik, self._board)
+            raw = await collect(self.client, self.mikrotik, self._cache)
         except UbusAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except UbusError as err:
             raise UpdateFailed(str(err)) from err
-        self._board = raw["board"]
         if raw.get("mikrotik_error"):
             _LOGGER.debug("Dzierzawy MikroTika niedostepne: %s", raw["mikrotik_error"])
         data, self._prev, new_macs = build(raw, self._prev, self._seen, self._ha_names(), self._watched(), time.time(),
@@ -87,6 +87,49 @@ class OpenWrtWifiCoordinator(DataUpdateCoordinator[dict]):
             names.pop(mac, None)
         await self._store.async_save(self._seen)
         await self.async_refresh()
+
+    # --- akcje na routerze ---
+
+    async def _action(self, coro) -> None:
+        try:
+            await coro
+        except UbusAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except UbusError as err:
+            raise HomeAssistantError(f"Router odrzucił polecenie: {err}") from err
+
+    async def async_kick_client(self, mac: str, ban_seconds: int = 0) -> None:
+        """Rozlacza klienta (deauth); ban_seconds > 0 blokuje ponowne polaczenie na ten czas."""
+        mac = mac.strip().lower().replace("-", ":")
+        client = next((c for c in (self.data or {}).get("clients", []) if c["mac"] == mac), None)
+        if client is None:
+            raise ValueError(f"Klient {mac} nie jest teraz polaczony")
+        await self._action(self.client.call(f"hostapd.{client['radio']}", "del_client", {
+            "addr": mac, "reason": 5, "deauth": True, "ban_time": int(ban_seconds) * 1000}))
+        await asyncio.sleep(1)
+        await self.async_refresh()
+
+    async def async_restart_wifi(self) -> None:
+        """Odpowiednik `wifi down && wifi up` (netifd)."""
+        await self._action(self.client.call("network.wireless", "down"))
+        await asyncio.sleep(2)
+        await self._action(self.client.call("network.wireless", "up"))
+
+    async def async_reboot(self) -> None:
+        await self._action(self.client.call("system", "reboot"))
+
+    async def async_set_channel(self, radio: str, channel: str) -> None:
+        """Zapisuje kanal w /etc/config/wireless (trwale) i przeladowuje Wi-Fi."""
+        r = next((x for x in (self.data or {}).get("radios", []) if radio in (x["radio"], x.get("uci_radio"))), None)
+        if r is None or not r.get("uci_radio"):
+            raise ValueError(f"Nieznane radio {radio}")
+        channel = str(channel).strip().lower()
+        if channel != "auto" and (not channel.isdigit() or int(channel) not in r.get("channels", [])):
+            raise ValueError(f"Kanal {channel} niedozwolony dla {r['radio']} ({r.get('channels')})")
+        await self._action(self.client.call("uci", "set", {
+            "config": "wireless", "section": r["uci_radio"], "values": {"channel": channel}}))
+        await self._action(self.client.call("uci", "commit", {"config": "wireless"}))
+        await self._action(self.client.call("network", "reload"))
 
     def _ha_names(self) -> dict[str, tuple[str, str | None]]:
         """MAC -> (nazwa, obszar) z rejestru urzadzen HA; pomija trackery i nazwy-MAC."""

@@ -101,6 +101,24 @@
       "radio_retry": {
         "name": "{radio} TX retries"
       }
+    },
+    "binary_sensor": {
+      "port": {
+        "name": "Port {port}"
+      }
+    },
+    "button": {
+      "restart_wifi": {
+        "name": "Restart Wi-Fi"
+      },
+      "reboot": {
+        "name": "Restart routera"
+      }
+    },
+    "select": {
+      "channel": {
+        "name": "{radio} kanał"
+      }
     }
   },
   "services": {
@@ -110,7 +128,7 @@
       "fields": {
         "entry_id": {
           "name": "Router",
-          "description": "Wpis integracji; puste = wszystkie routery."
+          "description": "Wpis integracji; wymagany, gdy routerów jest kilka."
         },
         "mac": {
           "name": "MAC",
@@ -119,6 +137,62 @@
         "name": {
           "name": "Nazwa",
           "description": "Nowa nazwa (puste = automatyczna)."
+        }
+      }
+    },
+    "kick_client": {
+      "name": "Rozłącz klienta",
+      "description": "Rozłącza klienta Wi-Fi (deauth). Opcjonalnie blokuje ponowne połączenie.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Wpis integracji; wymagany, gdy routerów jest kilka."
+        },
+        "mac": {
+          "name": "MAC",
+          "description": "Adres MAC klienta."
+        },
+        "ban_seconds": {
+          "name": "Blokada",
+          "description": "Na ile sekund zablokować ponowne połączenie (0 = bez blokady)."
+        }
+      }
+    },
+    "restart_wifi": {
+      "name": "Restart Wi-Fi",
+      "description": "Wyłącza i ponownie włącza Wi-Fi routera (wifi down/up). Klienci zostaną rozłączeni na kilka sekund.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Wpis integracji; wymagany, gdy routerów jest kilka."
+        }
+      }
+    },
+    "reboot": {
+      "name": "Restart routera",
+      "description": "Restartuje router OpenWrt.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Wpis integracji; wymagany, gdy routerów jest kilka."
+        }
+      }
+    },
+    "set_channel": {
+      "name": "Ustaw kanał",
+      "description": "Zapisuje kanał radia w /etc/config/wireless i przeładowuje Wi-Fi.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Wpis integracji; wymagany, gdy routerów jest kilka."
+        },
+        "radio": {
+          "name": "Radio",
+          "description": "Interfejs (np. wlan0) lub sekcja uci (np. radio0)."
+        },
+        "channel": {
+          "name": "Kanał",
+          "description": "Numer kanału albo auto."
         }
       }
     }

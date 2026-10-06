@@ -1,7 +1,7 @@
 /* OpenWrt Wi-Fi Dashboard: karta Lovelace `custom:openwrt-wifi-card` + panel `openwrt-wifi-panel`.
  * Wszystko rysowane z atrybutow sensora "Klienci Wi-Fi" integracji openwrt_wifi - nowi klienci
  * i radia pojawiaja sie sami, bez edycji dashboardu. */
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const QUALITY = { "Bardzo dobry": "#4caf50", "Dobry": "#ffc107", "Słaby": "#ff9800", "Zły": "#f44336" };
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -70,6 +70,24 @@ const STYLE = `
   .btn { --mdc-icon-size: 20px; cursor: pointer; padding: 3px; border-radius: 50%; color: var(--secondary-text-color); }
   .btn:hover { background: var(--secondary-background-color); color: var(--primary-color); }
   .tag { font-size: .7em; padding: 0 5px; border-radius: 4px; background: var(--secondary-background-color); color: var(--secondary-text-color); margin-left: 4px; }
+  .ports { display: flex; flex-wrap: wrap; gap: 6px; }
+  .port { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px;
+          background: var(--secondary-background-color); font-size: .85em; }
+  .port.down { opacity: .55; }
+  .ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .ctl button, .confirm button { font: inherit; font-size: .85em; cursor: pointer; border-radius: 8px; padding: 6px 12px;
+          border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color);
+          display: inline-flex; align-items: center; gap: 6px; }
+  .ctl button ha-icon, .confirm button ha-icon { --mdc-icon-size: 18px; }
+  .ctl button:hover { border-color: var(--primary-color); }
+  .ctl select { font: inherit; font-size: .85em; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--divider-color);
+          background: var(--card-background-color); color: var(--primary-text-color); }
+  .ctl label { font-size: .85em; color: var(--secondary-text-color); display: inline-flex; align-items: center; gap: 6px; }
+  .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 12px; border-radius: 8px;
+          border-left: 4px solid var(--error-color, #f44336); background: var(--secondary-background-color); font-size: .9em; }
+  .confirm button.yes { background: var(--error-color, #f44336); color: #fff; border-color: transparent; }
+  .kick { --mdc-icon-size: 18px; opacity: .35; cursor: pointer; }
+  .kick:hover, tr:hover .kick { opacity: .9; color: var(--error-color, #f44336); }
   .foot { margin-top: 10px; color: var(--secondary-text-color); font-size: .75em; }
   .empty { padding: 16px; text-align: center; color: var(--secondary-text-color); }
   @media (max-width: 640px) { .opt { display: none; } ha-card { padding: 12px; } }
@@ -113,6 +131,14 @@ class OpenWrtWifiCard extends HTMLElement {
           this._render();
         } else this._action(el.dataset.act, el.dataset.mac);
       });
+      this.shadowRoot.addEventListener("change", (ev) => {
+        const sel = ev.target;
+        if (sel.tagName === "SELECT" && sel.dataset.radio) {
+          this._confirm = { act: "channel", radio: sel.dataset.radio, value: sel.value,
+            text: `Zmienić kanał ${sel.dataset.label} na ${sel.value}? Wi-Fi zostanie przeładowane (klienci rozłączeni na kilka sekund).` };
+          this._render();
+        }
+      });
       this.shadowRoot.addEventListener("keydown", (ev) => {
         if (!this._editing || ev.target.tagName !== "INPUT") return;
         if (ev.key === "Enter") { ev.preventDefault(); this._action("save", this._editing); }
@@ -130,11 +156,16 @@ class OpenWrtWifiCard extends HTMLElement {
       return;
     }
     const a = st.attributes;
-    const show = new Set(this._config.sections || ["router", "alerts", "radios", "clients"]);
+    const admin = !this._hass.user || this._hass.user.is_admin;
+    const show = new Set(this._config.sections || ["router", "alerts", "ports", "radios", "controls", "clients"]);
+    if (!admin || this._config.controls === false) show.delete("controls");
+    this._kickable = admin && this._config.controls !== false;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style><ha-card>
       ${show.has("router") ? this._router(a) : ""}
       ${show.has("alerts") ? this._alerts(a) : ""}
+      ${show.has("ports") ? this._ports(a) : ""}
       ${show.has("radios") ? this._radios(a) : ""}
+      ${show.has("controls") ? this._controls(a) : ""}
       ${show.has("clients") ? this._clients(a) : ""}
       <div class="foot">Sygnał: <span class="ok">≥ -55</span> · <span style="color:#ffc107">-56…-67</span> · <span class="warn">-68…-75</span> · <span class="bad">&lt; -75 dBm</span>
         · Retry = % retransmisji TX od ostatniego odczytu · ❔ = brak urządzenia w HA · ✏️ = zmień nazwę ·
@@ -142,7 +173,38 @@ class OpenWrtWifiCard extends HTMLElement {
     </ha-card>`;
   }
 
+  _notify(message) {
+    this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message }, bubbles: true, composed: true }));
+  }
+
+  _entryId() {
+    const id = findEntity(this._hass, this._config);
+    return id && this._hass.states[id].attributes.entry_id;
+  }
+
+  _run(service, data, okMsg) {
+    this._hass.callService("openwrt_wifi", service, { entry_id: this._entryId(), ...data })
+      .then(() => okMsg && this._notify(okMsg))
+      .catch((err) => this._notify(`Błąd: ${err.message || err}`));
+  }
+
   _action(act, mac) {
+    if (act === "ask-wifi") { this._confirm = { act: "wifi", text: "Zrestartować Wi-Fi? Wszyscy klienci zostaną rozłączeni na kilka sekund." }; return this._render(); }
+    if (act === "ask-reboot") { this._confirm = { act: "reboot", text: "Zrestartować router? Sieć Wi-Fi zniknie na około minutę." }; return this._render(); }
+    if (act === "ask-kick") {
+      const c = (this._attrs().clients || []).find((x) => x.mac === mac);
+      this._confirm = { act: "kick", mac, text: `Rozłączyć ${c ? c.name : mac}? Urządzenie zwykle połączy się ponownie samo.` };
+      return this._render();
+    }
+    if (act === "no") { this._confirm = null; return this._render(); }
+    if (act === "yes") {
+      const c = this._confirm; this._confirm = null;
+      if (c.act === "wifi") this._run("restart_wifi", {}, "Restart Wi-Fi wysłany");
+      if (c.act === "reboot") this._run("reboot", {}, "Router się restartuje");
+      if (c.act === "kick") this._run("kick_client", { mac: c.mac }, "Klient rozłączony");
+      if (c.act === "channel") this._run("set_channel", { radio: c.radio, channel: c.value }, `Kanał zmieniony na ${c.value}`);
+      return this._render();
+    }
     if (act === "edit") {
       this._editing = mac;
       this._render();
@@ -155,14 +217,54 @@ class OpenWrtWifiCard extends HTMLElement {
       const name = act === "reset" ? "" : (inp ? inp.value.trim() : "");
       const id = findEntity(this._hass, this._config);
       const entry_id = id && this._hass.states[id].attributes.entry_id;
-      this._hass.callService("openwrt_wifi", "set_client_name", { entry_id, mac, name }).catch((err) => {
-        // eslint-disable-next-line no-alert
-        alert(`Nie udało się zapisać nazwy: ${err.message || err}`);
-      });
+      this._hass.callService("openwrt_wifi", "set_client_name", { entry_id, mac, name })
+        .catch((err) => this._notify(`Nie udało się zapisać nazwy: ${err.message || err}`));
     }
     this._editing = null;
     this._dirty = false;
     this._render();
+  }
+
+  _attrs() {
+    const id = findEntity(this._hass, this._config);
+    return (id && this._hass.states[id].attributes) || {};
+  }
+
+  _confirmBar() {
+    const c = this._confirm;
+    if (!c) return "";
+    return `<div class="confirm"><span style="flex:1">${esc(c.text)}</span>
+      <button class="yes" data-act="yes"><ha-icon icon="mdi:check"></ha-icon>Tak</button>
+      <button data-act="no"><ha-icon icon="mdi:close"></ha-icon>Anuluj</button></div>`;
+  }
+
+  _ports(a) {
+    const ports = a.ports || [];
+    if (!ports.length) return "";
+    return `<h3><ha-icon icon="mdi:ethernet"></ha-icon>Porty</h3><div class="ports">${ports.map((p) => {
+      const half = p.link && p.duplex === "half";
+      const col = !p.link ? "var(--disabled-text-color, #9e9e9e)" : half || (p.speed && p.speed < 100) ? "#ff9800" : "#4caf50";
+      const info = p.link ? `${p.speed ? (p.speed >= 1000 ? p.speed / 1000 + " Gb/s" : p.speed + " Mb/s") : "link"}${half ? " · half" : ""}` : "brak linku";
+      return `<span class="port ${p.link ? "" : "down"}" title="${esc(p.label)}${p.errors ? " · błędy: " + p.errors : ""}">
+        <span class="dot" style="background:${col}"></span><b>${esc(p.label)}</b> ${info}${p.errors ? ` <span class="bad">⚠ ${p.errors}</span>` : ""}</span>`;
+    }).join("")}</div>`;
+  }
+
+  _controls(a) {
+    const radios = (a.radios || []).filter((r) => r.uci_radio && (r.channels || []).length);
+    const sel = radios.map((r) => {
+      const label = `${r.band} ${r.ssid || r.radio}`;
+      const opts = ["auto", ...r.channels.map(String)].map((ch) => `<option value="${ch}" ${String(r.channel_cfg) === ch ? "selected" : ""}>${ch === "auto" ? "auto" : "kanał " + ch}</option>`).join("");
+      return `<label><ha-icon icon="mdi:access-point-network"></ha-icon>${esc(label)}
+        <select data-radio="${esc(r.radio)}" data-label="${esc(label)}">${opts}</select></label>`;
+    }).join("");
+    const warn = radios.filter((r) => r.htmode_cfg && r.htmode && r.htmode_cfg !== r.htmode)
+      .map((r) => `<div class="alert">ℹ️ ${esc(r.ssid || r.radio)}: ustawione ${esc(r.htmode_cfg)}, działa ${esc(r.htmode)} (np. sąsiednia sieć wymusza węższy kanał)${r.country ? ` · kraj ${esc(r.country)}` : ""}</div>`).join("");
+    return `<h3><ha-icon icon="mdi:tune-variant"></ha-icon>Sterowanie</h3><div class="ctl">
+      ${sel}
+      <button data-act="ask-wifi"><ha-icon icon="mdi:wifi-refresh"></ha-icon>Restart Wi-Fi</button>
+      <button data-act="ask-reboot"><ha-icon icon="mdi:restart"></ha-icon>Restart routera</button></div>
+      ${this._confirm && this._confirm.act !== "kick" ? this._confirmBar() : ""}${warn}`;
   }
 
   _nameCell(c) {
@@ -176,7 +278,8 @@ class OpenWrtWifiCard extends HTMLElement {
     }
     const sub = [c.area, (c.in_ha || c.custom) && c.host && c.host !== c.name ? c.host : null, c.ip, c.random_mac ? "prywatny MAC" : null]
       .filter(Boolean).map(esc).join(" · ");
-    const pencil = editable ? `<ha-icon class="edit" icon="mdi:pencil" title="Zmień nazwę" data-act="edit" data-mac="${esc(c.mac)}"></ha-icon>` : "";
+    const pencil = (editable ? `<ha-icon class="edit" icon="mdi:pencil" title="Zmień nazwę" data-act="edit" data-mac="${esc(c.mac)}"></ha-icon>` : "")
+      + (this._kickable ? `<ha-icon class="kick" icon="mdi:link-variant-off" title="Rozłącz" data-act="ask-kick" data-mac="${esc(c.mac)}"></ha-icon>` : "");
     return `<b>${esc(c.name)}</b>${c.custom ? '<span class="tag" title="Nazwa ustawiona ręcznie">ręcznie</span>' : c.in_ha ? "" : " ❔"}${pencil}
       <br><small>${sub || esc(c.mac)}</small>`;
   }
@@ -246,7 +349,8 @@ class OpenWrtWifiCard extends HTMLElement {
         <td class="c opt"><small>${c.inactive}s</small></td>
         <td class="c"><small>${dur(c.up)}</small></td></tr>`;
     }).join("");
-    return `<h3><ha-icon icon="mdi:devices"></ha-icon>Urządzenia (${a.clients.length})</h3><div class="scroll"><table>
+    return `<h3><ha-icon icon="mdi:devices"></ha-icon>Urządzenia (${a.clients.length})</h3>
+      ${this._confirm && this._confirm.act === "kick" ? this._confirmBar() : ""}<div class="scroll"><table>
       <tr><th data-sort="name">Urządzenie${arrow("name")}</th><th class="c opt" data-sort="band">Pasmo${arrow("band")}</th>
       <th class="c" data-sort="signal">Sygnał dBm${arrow("signal")}</th><th class="c" data-sort="retry">Retry${arrow("retry")}</th>
       <th class="c" data-sort="tx">TX / RX${arrow("tx")}</th><th class="c opt" data-sort="down_kbps">Transfer${arrow("down_kbps")}</th>

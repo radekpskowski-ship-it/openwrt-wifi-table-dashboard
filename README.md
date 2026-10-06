@@ -18,6 +18,10 @@ clients with signal quality, radios and router load. A sidebar panel and a Lovel
   dopasowane po MAC (z obszarem) → komentarz/hostname z DHCP (OpenWrt lub **MikroTik REST**) → MAC.
 - **Edycja nazw w dashboardzie:** ołówek przy nazwie → wpisz → Enter (✓). ↺ przywraca nazwę automatyczną,
   Esc anuluje. Nazwy zapisywane trwale w HA (przetrwają restart).
+- **Porty:** LAN/WAN z etykietami z `board.json` — link, prędkość, duplex (swconfig i DSA); encje `Port LANx`.
+- **Sterowanie** (tylko administratorzy, z potwierdzeniem w karcie): wybór kanału radia (zapis trwały w
+  `/etc/config/wireless`), restart Wi-Fi, restart routera, rozłączenie klienta. Ostrzeżenie, gdy radio działa
+  w innym trybie niż ustawiony (np. HT40 → HT20).
 - **Alerty:** nowe urządzenie (24 h) i zdarzenie `openwrt_wifi_new_client`; brak w sieci urządzeń HA
   z etykietą `wifi-krytyczne`.
 - Wszystko **dynamiczne** — nowi klienci i zmiany nazw pojawiają się przy następnym odczycie.
@@ -57,8 +61,9 @@ type: custom:openwrt-wifi-card
 entity: sensor.<nazwa>_klienci_wi_fi   # opcjonalnie; bez tego karta znajdzie sensor sama
 # entry_id: <id wpisu>                  # alternatywnie wybór routera po wpisie
 # title: Wi-Fi                          # własny tytuł
-# sections: [router, alerts, radios, clients]
+# sections: [router, alerts, ports, radios, controls, clients]
 # editable: false                      # ukryj ołówek edycji nazw
+# controls: false                      # ukryj sterowanie (kanał, restarty, rozłączanie)
 ```
 
 Najlepiej wygląda w widoku typu **Panel (pojedyncza karta)**.
@@ -83,6 +88,23 @@ data:
 ```
 
 W karcie edycję można wyłączyć opcją `editable: false`.
+
+## Usługi sterujące
+
+| Usługa | Dane |
+|---|---|
+| `openwrt_wifi.kick_client` | `mac`, opcjonalnie `ban_seconds` (blokada ponownego połączenia) |
+| `openwrt_wifi.restart_wifi` | — |
+| `openwrt_wifi.reboot` | — |
+| `openwrt_wifi.set_channel` | `radio` (`wlan0` / `radio0`), `channel` (numer albo `auto`) |
+
+Przy kilku routerach podaj `entry_id`. Te same akcje są dostępne jako encje: przyciski *Restart Wi-Fi*,
+*Restart routera* i lista wyboru *kanał* (kategoria Konfiguracja). Sekcję sterowania w karcie ukrywa `controls: false`.
+
+Wymagane uprawnienia ubus (konto inne niż root): `hostapd.*.del_client`, `network.wireless.down/up`,
+`network.reload`, `uci.set/commit` (config `wireless`), `system.reboot`, `luci.getSwconfigPortState`,
+`luci-rpc.getBoardJSON/getNetworkDevices`, `network.wireless.status`. Integracja nie zapisuje w HA haseł Wi-Fi,
+które OpenWrt zwraca w `network.wireless status`.
 
 ## Automatyzacja: powiadomienie o nowym urządzeniu
 

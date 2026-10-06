@@ -11,11 +11,16 @@ from .const import ICON_COLORS, ICON_RULES, NEW_WINDOW, QUALITY, QUALITY_KEYS, W
 MAC_RE = re.compile(r"^([0-9a-f]{2}[:-]?){5}[0-9a-f]{2}$", re.I)
 
 
-async def collect(client: UbusClient, mikrotik: MikroTikLeases | None, board: dict | None) -> dict:
-    """Jeden przebieg odpytywania. Metody opcjonalne (brak ACL/pakietu) daja None."""
-    if board is None:
-        board = await client.call("system", "board")
-    info, stat, devices, ifaces, netdevs, leases, hints, arp = await asyncio.gather(
+async def collect(client: UbusClient, mikrotik: MikroTikLeases | None, cache: dict) -> dict:
+    """Jeden przebieg odpytywania. Metody opcjonalne (brak ACL/pakietu) daja None.
+
+    cache - dane statyczne (system.board, board.json), pobierane raz na wpis.
+    """
+    if "board" not in cache:
+        cache["board"] = await client.call("system", "board")
+        cache["boardjson"] = await client.call("luci-rpc", "getBoardJSON", optional=True) or {}
+    board = cache["board"]
+    info, stat, devices, ifaces, netdevs, leases, hints, arp, wstatus, ndevs = await asyncio.gather(
         client.call("system", "info"),
         client.call("file", "read", {"path": "/proc/stat"}, optional=True),
         client.call("iwinfo", "devices"),
@@ -24,28 +29,88 @@ async def collect(client: UbusClient, mikrotik: MikroTikLeases | None, board: di
         client.call("luci-rpc", "getDHCPLeases", optional=True),
         client.call("luci-rpc", "getHostHints", optional=True),
         client.call("file", "read", {"path": "/proc/net/arp"}, optional=True),
+        client.call("network.wireless", "status", optional=True),
+        client.call("luci-rpc", "getNetworkDevices", optional=True),
     )
     radios = []
     for dev in devices.get("devices", []):
-        rinfo, assoc, survey = await asyncio.gather(
+        rinfo, assoc, survey, freqs = await asyncio.gather(
             client.call("iwinfo", "info", {"device": dev}, optional=True),
             client.call("iwinfo", "assoclist", {"device": dev}, optional=True),
             client.call("iwinfo", "survey", {"device": dev}, optional=True),
+            client.call("iwinfo", "freqlist", {"device": dev}, optional=True),
         )
         if rinfo is None or rinfo.get("mode") not in ("Master", "Mesh Point", None):
             continue  # pomijamy interfejsy klienckie/monitor
         radios.append({"dev": dev, "info": rinfo, "assoc": (assoc or {}).get("results", []),
-                       "survey": (survey or {}).get("results", [])})
+                       "survey": (survey or {}).get("results", []), "freqs": (freqs or {}).get("results", [])})
+    switches = {}
+    for name in ((cache.get("boardjson") or {}).get("switch") or {}):
+        state = await client.call("luci", "getSwconfigPortState", {"switch": name}, optional=True)
+        switches[name] = (state or {}).get("result") or []
     mt, mt_error = None, None
     if mikrotik is not None:
         try:
             mt = await mikrotik.leases()
         except UbusError as err:
             mt_error = str(err)
-    return {"board": board, "info": info, "stat": (stat or {}).get("data"), "radios": radios,
+    return {"board": board, "boardjson": cache.get("boardjson") or {}, "wireless": _radio_cfg(wstatus),
+            "switches": switches, "ndevs": ndevs or {}, "info": info, "stat": (stat or {}).get("data"), "radios": radios,
             "ifaces": (ifaces or {}).get("interface", []), "netdevs": netdevs or {},
             "leases": (leases or {}).get("dhcp_leases", []), "hints": hints or {},
             "arp": (arp or {}).get("data"), "mikrotik": mt, "mikrotik_error": mt_error}
+
+
+def _radio_cfg(status: dict | None) -> dict[str, dict]:
+    """ifname -> {radio, channel, htmode, band, country} z network.wireless status.
+
+    Celowo kopiujemy tylko te pola: status zawiera tez haslo Wi-Fi (config.key) jawnym tekstem.
+    """
+    out = {}
+    for radio, r in (status or {}).items():
+        cfg = r.get("config") or {}
+        for iface in r.get("interfaces") or []:
+            if iface.get("ifname"):
+                out[iface["ifname"]] = {"radio": radio, "channel": str(cfg.get("channel", "auto")),
+                                        "htmode": cfg.get("htmode"), "band": cfg.get("band"),
+                                        "country": cfg.get("country")}
+    return out
+
+
+def _ports(raw: dict) -> list[dict]:
+    """Porty fizyczne: swconfig (starsze targety) albo DSA/netdev (nowsze) + WAN jako netdev."""
+    bj, ndevs = raw.get("boardjson") or {}, raw.get("ndevs") or {}
+    ports = []
+    for sw, cfg in (bj.get("switch") or {}).items():
+        state = {p.get("port"): p for p in raw.get("switches", {}).get(sw, [])}
+        for p in cfg.get("ports") or []:
+            if p.get("device"):  # port CPU
+                continue
+            st = state.get(p.get("num"), {})
+            role = (p.get("role") or "port").upper()
+            ports.append({"id": f"{sw}_{p.get('num')}", "label": f"{role}{p.get('index', p.get('num'))}",
+                          "link": bool(st.get("link")), "speed": st.get("speed") or None,
+                          "duplex": ("full" if st.get("duplex") else "half") if st.get("link") else None,
+                          "errors": None})
+    netdev_ports = []
+    for role, cfg in (bj.get("network") or {}).items():
+        if cfg.get("ports"):
+            netdev_ports += [(dev, dev.upper()) for dev in cfg["ports"]]
+        elif role == "wan" and cfg.get("device") and "." not in cfg["device"]:
+            netdev_ports.append((cfg["device"], "WAN"))
+    for dev, label in netdev_ports:
+        nd = ndevs.get(dev)
+        if nd is None:
+            continue
+        link, stats = nd.get("link") or {}, nd.get("stats") or {}
+        speed = link.get("speed")
+        ports.append({"id": dev, "label": label, "link": bool(link.get("carrier")),
+                      "speed": speed if speed and speed > 0 else None,
+                      "duplex": link.get("duplex") if link.get("carrier") and link.get("duplex") != "unknown" else None,
+                      "errors": (stats.get("rx_errors") or 0) + (stats.get("tx_errors") or 0)})
+    order = {"WAN": 0}
+    ports.sort(key=lambda p: (order.get(p["label"][:3], 1), p["label"]))
+    return ports
 
 
 def quality(sig: int | None) -> str:
@@ -237,8 +302,12 @@ def build(raw: dict, prev: dict, seen: dict, ha_names: dict, watch: list, now: f
                 "up": a.get("connected_time"),
                 "first_seen": first[mac] or None,
             })
+        wcfg = (raw.get("wireless") or {}).get(r["dev"], {})
         radios.append({
-            "radio": r["dev"], "ssid": ri.get("ssid"), "bssid": (ri.get("bssid") or "").lower(),
+            "radio": r["dev"], "uci_radio": wcfg.get("radio"), "channel_cfg": wcfg.get("channel"),
+            "htmode_cfg": wcfg.get("htmode"), "country": wcfg.get("country") or ri.get("country"),
+            "channels": [f["channel"] for f in r.get("freqs", []) if not f.get("restricted")],
+            "ssid": ri.get("ssid"), "bssid": (ri.get("bssid") or "").lower(),
             "band": band_of(freq), "ch": ri.get("channel"), "htmode": ri.get("htmode"),
             "power": ri.get("txpower"), "noise": ri.get("noise"), "util": util,
             "retry": round(100 * r_rt / (r_pk + r_rt), 1) if (r_pk + r_rt) else 0.0,
@@ -258,7 +327,7 @@ def build(raw: dict, prev: dict, seen: dict, ha_names: dict, watch: list, now: f
         ok = mac in online or now - last.get(mac, 0) < WATCH_GRACE
         watch_out.append({"name": wname, "area": warea, "mac": mac, "online": ok, "last_seen": last.get(mac)})
     data = {
-        "router": router, "radios": radios, "clients": clients, "count": len(clients),
+        "router": router, "radios": radios, "ports": _ports(raw), "clients": clients, "count": len(clients),
         "counts": {k: sum(1 for c in clients if c["q"] == k) for k in QUALITY_KEYS},
         "new": new, "new_macs": sorted(c["mac"] for c in new),
         "watch": watch_out, "missing_macs": sorted(w["mac"] for w in watch_out if not w["online"]),

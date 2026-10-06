@@ -124,7 +124,7 @@ class ClientsSensor(OpenWrtWifiEntity, SensorEntity):
     _attr_native_unit_of_measurement = "klientów"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _unrecorded_attributes = frozenset({
-        "router", "radios", "clients", "counts", "new", "new_macs", "watch", "missing_macs",
+        "router", "radios", "ports", "clients", "counts", "new", "new_macs", "watch", "missing_macs",
         "updated", "entry_id", "integration", "title", "version", "mikrotik_error",
     })
 
@@ -141,7 +141,7 @@ class ClientsSensor(OpenWrtWifiEntity, SensorEntity):
         return {
             "integration": DOMAIN, "version": VERSION, "entry_id": self.coordinator.config_entry.entry_id,
             "title": self.coordinator.config_entry.title,
-            **{k: d[k] for k in ("router", "radios", "clients", "counts", "new", "new_macs", "watch",
+            **{k: d.get(k) for k in ("router", "radios", "ports", "clients", "counts", "new", "new_macs", "watch",
                                  "missing_macs", "mikrotik_error", "updated")},
         }
 

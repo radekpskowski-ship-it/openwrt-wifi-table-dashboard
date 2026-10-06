@@ -1,7 +1,7 @@
 """Stale integracji OpenWrt Wi-Fi Dashboard."""
 
 DOMAIN = "openwrt_wifi"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 CONF_SSL = "ssl"
 CONF_SCAN_INTERVAL = "scan_interval"
