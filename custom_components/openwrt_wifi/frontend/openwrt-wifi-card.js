@@ -1,7 +1,7 @@
 /* OpenWrt Wi-Fi Dashboard: karta Lovelace `custom:openwrt-wifi-card` + panel `openwrt-wifi-panel`.
  * Wszystko rysowane z atrybutow sensora "Klienci Wi-Fi" integracji openwrt_wifi - nowi klienci
  * i radia pojawiaja sie sami, bez edycji dashboardu. */
-const VERSION = "1.3.0";
+const VERSION = "1.4.0";
 const QUALITY = { "Bardzo dobry": "#4caf50", "Dobry": "#ffc107", "Słaby": "#ff9800", "Zły": "#f44336" };
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -70,44 +70,43 @@ const STYLE = `
   .btn { --mdc-icon-size: 20px; cursor: pointer; padding: 3px; border-radius: 50%; color: var(--secondary-text-color); }
   .btn:hover { background: var(--secondary-background-color); color: var(--primary-color); }
   .tag { font-size: .7em; padding: 0 5px; border-radius: 4px; background: var(--secondary-background-color); color: var(--secondary-text-color); margin-left: 4px; }
-  .faceplate { display: flex; align-items: flex-start; gap: 14px; padding: 10px 16px 8px; border-radius: 12px; overflow-x: auto;
-               background: linear-gradient(180deg, #3b4048 0%, #262a30 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 1px 3px rgba(0,0,0,.25); }
-  .pgroup { display: flex; gap: 10px; }
-  .psep { width: 1px; align-self: stretch; background: rgba(255,255,255,.14); }
-  .model { margin-left: auto; align-self: center; color: rgba(255,255,255,.45); font-size: .72em; letter-spacing: .06em; text-align: right; max-width: 140px; }
-  .pt { display: flex; flex-direction: column; align-items: center; width: 70px; flex: none; text-align: center; }
-  .pt .extra { font-size: .62em; color: #ffb74d; line-height: 1.2; min-height: 1.2em; }
-  .pt .lbl { font-size: .7em; font-weight: 600; letter-spacing: .06em; color: #d5d9de; margin-bottom: 3px; }
-  .pt .lbl.wan { color: #64b5f6; }
-  .pt .jack { width: 48px; height: 66px; display: block; }
-  .pt .spd { font-size: .72em; margin-top: 2px; white-space: nowrap; font-weight: 500; }
-  .jack .body { fill: #1b1e22; stroke: #4a5059; stroke-width: 1.2; }
-  .jack .hole { fill: #07080a; stroke: #3a3f46; stroke-width: 1; }
-  .jack .pin { fill: #5a5f66; }
-  .jack .led, .jack .led2 { fill: #3a3f46; }
-  .jack .plug { fill: #c9d1d9; fill-opacity: .9; }
-  .jack .cable { fill: #9aa4ae; }
-  .pt.up .led { fill: #4caf50; filter: drop-shadow(0 0 3px #4caf50); animation: owled 2.4s ease-in-out infinite; }
-  .pt.up .led2 { fill: #ffb300; filter: drop-shadow(0 0 2px #ffb300); }
-  .pt.up .pin, .pt.warn .pin { fill: #d4a017; }
-  .pt.up .hole { stroke: #4caf50; }
-  .pt.up .spd { color: #81c784; }
-  .pt.up .cable { fill: #4caf50; }
-  .pt.warn .led { fill: #ff9800; filter: drop-shadow(0 0 3px #ff9800); }
-  .pt.warn .hole { stroke: #ff9800; }
-  .pt.warn .spd { color: #ffb74d; }
-  .pt.warn .cable { fill: #ff9800; }
-  .pt.down .spd { color: #8a9099; }
-  .pt.down .jack { opacity: .75; }
+  .sw { --tw: minmax(34px, 64px); background: #1c1f23; color: #c9cdd2; border-radius: 14px; padding: 14px 18px 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); }
+  .sw-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; margin-bottom: 14px; }
+  .sw-k { font-size: .72em; letter-spacing: .06em; color: #9aa0a6; margin-bottom: 4px; }
+  .sw-track { position: relative; height: 22px; border-radius: 11px; background: #3a3d42; overflow: hidden; }
+  .sw-track i { position: absolute; inset: 0 auto 0 0; border-radius: 11px; transition: width .6s; }
+  .sw-track span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: .8em; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+  .sw-groups { display: flex; flex-wrap: wrap; gap: 18px 26px; align-items: flex-end; justify-content: safe center; overflow-x: auto; padding: 4px 2px 2px; }
+  .sw-g { flex: 0 1 auto; min-width: 0; }
+  .sw-g.wan { flex: 0 0 auto; }
+  .sw-gt { text-align: center; font-size: .72em; letter-spacing: .1em; color: #9aa0a6; margin-bottom: 4px; }
+  .sw-grid { display: grid; gap: 6px 6px; justify-content: safe center; overflow-x: auto; padding-top: 4px; }
+  .sp { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .sp-n { font-size: .68em; color: #9aa0a6; margin-bottom: 3px; }
+  .sp-t { position: relative; width: 100%; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+          font-weight: 700; font-size: .8em; color: #fff; letter-spacing: .02em; gap: 2px; }
+  .sp-t small { font-size: .6em; font-weight: 600; opacity: .9; }
+  .sp-t.down { background: #3a3d42; }
+  .sp-t.gig { background: #4caf50; }
+  .sp-t.slow { background: #ff6b35; }
+  .sp-t.fast { background: #1e88e5; }
+  .sp-err { position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: #f44336; box-shadow: 0 0 0 2px #1c1f23; }
+  .sw-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 12px; font-size: .72em; color: #9aa0a6; }
+  .sw-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .sw-legend i.slow { background: #ff6b35; } .sw-legend i.gig { background: #4caf50; } .sw-legend i.fast { background: #1e88e5; } .sw-legend i.down { background: #5a5e64; }
+  .sw-foot { display: flex; flex-wrap: wrap; gap: 4px 0; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); font-size: .74em; color: #9aa0a6; }
+  .sw-foot span { padding: 0 14px; border-left: 1px solid rgba(255,255,255,.12); }
+  .sw-foot span:first-child { padding-left: 0; border-left: none; }
+  .sw-foot b { color: #e3e6e9; font-weight: 500; margin-left: 4px; }
   @media (max-width: 640px) {
-    .faceplate { gap: 8px; padding: 8px 10px 6px; }
-    .pgroup { gap: 4px; }
-    .pt { width: 54px; }
-    .pt .jack { width: 38px; height: 52px; }
-    .model { display: none; }
+    .sw { --tw: minmax(28px, 48px); padding: 12px 10px 8px; }
+    .sw-bars { gap: 8px 12px; }
+    .sp-t { height: 30px; font-size: .62em; border-radius: 7px; }
+    .sw-grid { gap: 5px 4px; }
+    .sw-groups { gap: 12px 14px; }
+    .sw-foot { flex-direction: column; }
+    .sw-foot span { padding: 0; border-left: none; }
   }
-  @keyframes owled { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
-  @media (prefers-reduced-motion: reduce) { .pt.up .led { animation: none; } }
   .ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .ctl button, .confirm button { font: inherit; font-size: .85em; cursor: pointer; border-radius: 8px; padding: 6px 12px;
           border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color);
@@ -276,32 +275,43 @@ class OpenWrtWifiCard extends HTMLElement {
     const ports = a.ports || [];
     if (!ports.length) return "";
     const r = a.router || {};
-    const wan = ports.filter((p) => p.label.startsWith("WAN")), lan = ports.filter((p) => !p.label.startsWith("WAN"));
-    const speedTxt = (p) => (!p.link ? "—" : !p.speed ? "link" : p.speed >= 1000 ? `${p.speed / 1000} Gb/s` : `${p.speed} Mb/s`);
-    const jack = (p) => {
-      const warn = p.link && (p.duplex === "half" || (p.speed && p.speed < 100));
-      const state = !p.link ? "down" : warn ? "warn" : "up";
-      const title = `${p.label}: ${p.link ? `połączony, ${speedTxt(p)}${p.duplex ? ", " + p.duplex + " duplex" : ""}` : "brak linku"}${p.errors ? `, błędy: ${p.errors}` : ""}`;
-      const pins = Array.from({ length: 8 }, (_, i) => `<rect x="${12.5 + i * 3}" y="12" width="1.6" height="5" class="pin"/>`).join("");
-      // gniazdo RJ45 + (gdy jest link) wtyczka z kablem
-      return `<div class="pt ${state}" title="${esc(title)}">
-        <div class="lbl ${p.label.startsWith("WAN") ? "wan" : ""}">${esc(p.label)}</div>
-        <svg viewBox="0 0 48 66" class="jack" aria-hidden="true">
-          <rect x="1" y="1" width="46" height="42" rx="4" class="body"/>
-          <circle cx="7" cy="6" r="2.4" class="led"/><circle cx="41" cy="6" r="2.4" class="led2"/>
-          <path d="M9 10 H39 V30 H33 V37 H15 V30 H9 Z" class="hole"/>${pins}
-          ${p.link ? `<path d="M11 15 H37 V31 H32 V36 H16 V31 H11 Z" class="plug"/><rect x="21" y="36" width="6" height="30" rx="2" class="cable"/>` : ""}
-        </svg>
-        <div class="spd">${speedTxt(p)}</div>
-        <div class="extra">${[p.link && p.duplex === "half" ? "half" : "", p.errors ? `⚠ ${p.errors}` : ""].filter(Boolean).join(" ") || "&nbsp;"}</div>
-      </div>`;
+    const isWan = (p) => p.label.startsWith("WAN");
+    const wan = ports.filter(isWan), lan = ports.filter((p) => !isWan(p));
+    const num = (p) => (p.label.match(/(\d+)$/) || [])[1] || p.label;
+    const kind = (p) => (!p.link ? "down" : p.duplex === "half" || !p.speed || p.speed <= 100 ? "slow" : p.speed >= 2500 ? "fast" : "gig");
+    const spd = (p) => (!p.link ? "" : !p.speed ? "UP" : p.speed >= 1000 ? `${+(p.speed / 1000).toFixed(1)}G` : `${p.speed}M`);
+    const tile = (p, label, pos = "") => {
+      const tip = `${p.label}: ${p.link ? `link ${p.speed ? p.speed + " Mb/s" : ""}${p.duplex ? ", " + p.duplex + " duplex" : ""}` : "brak linku"}${p.errors ? `, błędy: ${p.errors}` : ""}`;
+      return `<div class="sp" style="${pos}" title="${esc(tip)}"><div class="sp-n">${esc(label)}</div>
+        <div class="sp-t ${kind(p)}">${spd(p)}${p.link && p.duplex === "half" ? "<small>DM</small>" : ""}${p.errors ? '<i class="sp-err"></i>' : ""}</div></div>`;
+    };
+    // > 8 portow: dwa rzedy jak w switchu (parzyste u gory, nieparzyste na dole)
+    const two = lan.length > 8;
+    const lanTiles = lan.map((p, i) => {
+      if (!two) return tile(p, num(p));
+      const n = i + 1;
+      return tile(p, num(p), `grid-column:${Math.ceil(n / 2)};grid-row:${n % 2 ? 2 : 1}`);
+    }).join("");
+    const cols = two ? Math.ceil(lan.length / 2) : lan.length;
+    const bar = (label, v) => {
+      const val = Number(v) || 0, col = val >= 85 ? "#f44336" : val >= 60 ? "#ff9800" : "#4caf50";
+      return `<div class="sw-bar"><div class="sw-k">${label}</div><div class="sw-track"><i style="width:${Math.min(100, val)}%;background:${col}"></i>
+        <span>${v === null || v === undefined ? "–" : Math.round(val) + "%"}</span></div></div>`;
     };
     const up = ports.filter((p) => p.link).length;
     return `<h3><ha-icon icon="mdi:ethernet"></ha-icon>Porty <span class="muted">(${up}/${ports.length} podłączone)</span></h3>
-      <div class="faceplate">
-        ${wan.length ? `<div class="pgroup">${wan.map(jack).join("")}</div><div class="psep"></div>` : ""}
-        <div class="pgroup">${lan.map(jack).join("")}</div>
-        <div class="model">${esc(r.model || "")}</div>
+      <div class="sw">
+        <div class="sw-bars">${bar("CPU", r.cpu)}${bar("PAMIĘĆ", r.mem_pct)}</div>
+        <div class="sw-groups">
+          <div class="sw-g"><div class="sw-gt">LAN</div>
+            <div class="sw-grid" style="grid-template-columns:repeat(${cols}, var(--tw))">${lanTiles}</div></div>
+          ${wan.length ? `<div class="sw-g wan"><div class="sw-gt">WAN</div>
+            <div class="sw-grid" style="grid-template-columns:repeat(${wan.length}, var(--tw))">${wan.map((p) => tile(p, wan.length > 1 ? num(p) : "\u00a0")).join("")}</div></div>` : ""}
+        </div>
+        <div class="sw-legend"><span><i class="slow"></i>10/100/DM</span><span><i class="gig"></i>1G</span><span><i class="fast"></i>2,5G+</span><span><i class="down"></i>brak linku</span></div>
+        <div class="sw-foot"><span>Nazwa: <b>${esc(r.model || r.hostname || "–")}</b></span>
+          <span>FW: <b>${esc((r.firmware || "–").replace(/^OpenWrt /, ""))}</b></span>
+          <span>Uptime: <b>${dur(r.uptime)}</b></span></div>
       </div>`;
   }
 
