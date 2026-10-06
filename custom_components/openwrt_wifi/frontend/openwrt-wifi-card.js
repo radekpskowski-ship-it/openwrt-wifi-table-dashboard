@@ -1,7 +1,7 @@
 /* OpenWrt Wi-Fi Dashboard: karta Lovelace `custom:openwrt-wifi-card` + panel `openwrt-wifi-panel`.
  * Wszystko rysowane z atrybutow sensora "Klienci Wi-Fi" integracji openwrt_wifi - nowi klienci
  * i radia pojawiaja sie sami, bez edycji dashboardu. */
-const VERSION = "1.4.0";
+const VERSION = "1.4.1";
 const QUALITY = { "Bardzo dobry": "#4caf50", "Dobry": "#ffc107", "Słaby": "#ff9800", "Zły": "#f44336" };
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -71,11 +71,6 @@ const STYLE = `
   .btn:hover { background: var(--secondary-background-color); color: var(--primary-color); }
   .tag { font-size: .7em; padding: 0 5px; border-radius: 4px; background: var(--secondary-background-color); color: var(--secondary-text-color); margin-left: 4px; }
   .sw { --tw: minmax(34px, 64px); background: #1c1f23; color: #c9cdd2; border-radius: 14px; padding: 14px 18px 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); }
-  .sw-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; margin-bottom: 14px; }
-  .sw-k { font-size: .72em; letter-spacing: .06em; color: #9aa0a6; margin-bottom: 4px; }
-  .sw-track { position: relative; height: 22px; border-radius: 11px; background: #3a3d42; overflow: hidden; }
-  .sw-track i { position: absolute; inset: 0 auto 0 0; border-radius: 11px; transition: width .6s; }
-  .sw-track span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: .8em; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
   .sw-groups { display: flex; flex-wrap: wrap; gap: 18px 26px; align-items: flex-end; justify-content: safe center; overflow-x: auto; padding: 4px 2px 2px; }
   .sw-g { flex: 0 1 auto; min-width: 0; }
   .sw-g.wan { flex: 0 0 auto; }
@@ -100,7 +95,6 @@ const STYLE = `
   .sw-foot b { color: #e3e6e9; font-weight: 500; margin-left: 4px; }
   @media (max-width: 640px) {
     .sw { --tw: minmax(28px, 48px); padding: 12px 10px 8px; }
-    .sw-bars { gap: 8px 12px; }
     .sp-t { height: 30px; font-size: .62em; border-radius: 7px; }
     .sw-grid { gap: 5px 4px; }
     .sw-groups { gap: 12px 14px; }
@@ -293,15 +287,9 @@ class OpenWrtWifiCard extends HTMLElement {
       return tile(p, num(p), `grid-column:${Math.ceil(n / 2)};grid-row:${n % 2 ? 2 : 1}`);
     }).join("");
     const cols = two ? Math.ceil(lan.length / 2) : lan.length;
-    const bar = (label, v) => {
-      const val = Number(v) || 0, col = val >= 85 ? "#f44336" : val >= 60 ? "#ff9800" : "#4caf50";
-      return `<div class="sw-bar"><div class="sw-k">${label}</div><div class="sw-track"><i style="width:${Math.min(100, val)}%;background:${col}"></i>
-        <span>${v === null || v === undefined ? "–" : Math.round(val) + "%"}</span></div></div>`;
-    };
     const up = ports.filter((p) => p.link).length;
     return `<h3><ha-icon icon="mdi:ethernet"></ha-icon>Porty <span class="muted">(${up}/${ports.length} podłączone)</span></h3>
       <div class="sw">
-        <div class="sw-bars">${bar("CPU", r.cpu)}${bar("PAMIĘĆ", r.mem_pct)}</div>
         <div class="sw-groups">
           <div class="sw-g"><div class="sw-gt">LAN</div>
             <div class="sw-grid" style="grid-template-columns:repeat(${cols}, var(--tw))">${lanTiles}</div></div>
