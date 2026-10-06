@@ -122,3 +122,7 @@ actions:
 ```
 
 Pierwszy odczyt po dodaniu routera jest bazowy — obecni klienci nie są zgłaszani jako nowi.
+
+## Licencja
+
+GPL-3.0 — zob. [LICENSE](LICENSE).
