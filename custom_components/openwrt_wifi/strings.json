@@ -1,0 +1,106 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "OpenWrt router (ubus)",
+        "description": "Data via ubus over uhttpd (rpcd + uhttpd-mod-ubus, standard with LuCI). User root has full access; empty password = root without password.",
+        "data": {
+          "name": "Name",
+          "host": "Host",
+          "port": "Port",
+          "username": "Username",
+          "password": "Password",
+          "ssl": "HTTPS",
+          "verify_ssl": "Verify certificate"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "Router {host} rejected the login. Enter current credentials.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach /ubus.",
+      "invalid_auth": "Invalid credentials.",
+      "no_wifi": "No Wi-Fi interfaces found in iwinfo.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "Router already configured.",
+      "reauth_successful": "Re-authentication successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Wi-Fi dashboard settings",
+        "description": "Client names: HA devices (by MAC) first, then DHCP comment/hostname. If another router serves DHCP (e.g. MikroTik), enter its REST API (RouterOS 7).",
+        "data": {
+          "scan_interval": "Scan interval",
+          "show_panel": "Sidebar panel",
+          "panel_title": "Panel title",
+          "client_sensors": "Per-client signal sensors",
+          "watch_label": "Label of critical devices",
+          "mikrotik_host": "MikroTik DHCP host (empty = off)",
+          "mikrotik_username": "MikroTik username",
+          "mikrotik_password": "MikroTik password",
+          "mikrotik_ssl": "MikroTik HTTPS"
+        }
+      }
+    },
+    "error": {
+      "mikrotik_auth": "MikroTik rejected the login.",
+      "mikrotik_cannot_connect": "Cannot reach MikroTik REST."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "clients": {
+        "name": "Wi-Fi clients"
+      },
+      "cpu": {
+        "name": "CPU"
+      },
+      "load1": {
+        "name": "Load 1m"
+      },
+      "memory": {
+        "name": "Memory"
+      },
+      "lan_rx": {
+        "name": "LAN RX"
+      },
+      "lan_tx": {
+        "name": "LAN TX"
+      },
+      "wan_rx": {
+        "name": "WAN RX"
+      },
+      "wan_tx": {
+        "name": "WAN TX"
+      },
+      "boot": {
+        "name": "Last boot"
+      },
+      "firmware": {
+        "name": "Firmware"
+      },
+      "radio_clients": {
+        "name": "{radio} clients"
+      },
+      "radio_util": {
+        "name": "{radio} channel utilization"
+      },
+      "radio_noise": {
+        "name": "{radio} noise"
+      },
+      "radio_retry": {
+        "name": "{radio} TX retries"
+      }
+    }
+  }
+}

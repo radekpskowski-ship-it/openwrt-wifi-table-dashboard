@@ -1,0 +1,17 @@
+{
+  "domain": "openwrt_wifi",
+  "name": "OpenWrt Wi-Fi Dashboard",
+  "codeowners": [
+    "@radekpskowski-ship-it"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "http",
+    "frontend"
+  ],
+  "documentation": "https://github.com/radekpskowski-ship-it/openwrt-wifi-table-dashboard",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/radekpskowski-ship-it/openwrt-wifi-table-dashboard/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

@@ -1,0 +1,106 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Router OpenWrt (ubus)",
+        "description": "Dane z ubus przez uhttpd (pakiety rpcd + uhttpd-mod-ubus, standardowo z LuCI). Użytkownik root ma pełny dostęp; puste hasło = root bez hasła.",
+        "data": {
+          "name": "Nazwa (np. Wi-Fi Szafranki)",
+          "host": "Adres IP / host",
+          "port": "Port",
+          "username": "Użytkownik",
+          "password": "Hasło",
+          "ssl": "HTTPS",
+          "verify_ssl": "Weryfikuj certyfikat"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Ponowne logowanie",
+        "description": "Router {host} odrzucił logowanie. Podaj aktualne dane.",
+        "data": {
+          "username": "Użytkownik",
+          "password": "Hasło"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Brak połączenia z /ubus (sprawdź adres, port, uhttpd-mod-ubus).",
+      "invalid_auth": "Logowanie odrzucone.",
+      "no_wifi": "Router nie ma interfejsów Wi-Fi w iwinfo.",
+      "unknown": "Nieoczekiwany błąd."
+    },
+    "abort": {
+      "already_configured": "Ten router jest już dodany.",
+      "reauth_successful": "Zalogowano ponownie."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ustawienia dashboardu Wi-Fi",
+        "description": "Nazwy klientów: najpierw urządzenia HA (po MAC), potem komentarz/hostname z DHCP. Gdy DHCP robi inny router (np. MikroTik), podaj jego REST API (RouterOS 7).",
+        "data": {
+          "scan_interval": "Odświeżanie",
+          "show_panel": "Panel w pasku bocznym",
+          "panel_title": "Tytuł panelu",
+          "client_sensors": "Osobny sensor sygnału dla każdego klienta (historia)",
+          "watch_label": "Etykieta ważnych urządzeń (alert, gdy znikną)",
+          "mikrotik_host": "MikroTik z DHCP – adres (puste = nie używaj)",
+          "mikrotik_username": "MikroTik – użytkownik",
+          "mikrotik_password": "MikroTik – hasło",
+          "mikrotik_ssl": "MikroTik – HTTPS"
+        }
+      }
+    },
+    "error": {
+      "mikrotik_auth": "MikroTik odrzucił logowanie.",
+      "mikrotik_cannot_connect": "Brak połączenia z REST MikroTika (/rest/ip/dhcp-server/lease)."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "clients": {
+        "name": "Klienci Wi-Fi"
+      },
+      "cpu": {
+        "name": "CPU"
+      },
+      "load1": {
+        "name": "Load 1m"
+      },
+      "memory": {
+        "name": "Pamięć"
+      },
+      "lan_rx": {
+        "name": "LAN RX"
+      },
+      "lan_tx": {
+        "name": "LAN TX"
+      },
+      "wan_rx": {
+        "name": "WAN RX"
+      },
+      "wan_tx": {
+        "name": "WAN TX"
+      },
+      "boot": {
+        "name": "Ostatni start"
+      },
+      "firmware": {
+        "name": "Firmware"
+      },
+      "radio_clients": {
+        "name": "{radio} klienci"
+      },
+      "radio_util": {
+        "name": "{radio} zajętość kanału"
+      },
+      "radio_noise": {
+        "name": "{radio} szum"
+      },
+      "radio_retry": {
+        "name": "{radio} TX retries"
+      }
+    }
+  }
+}
