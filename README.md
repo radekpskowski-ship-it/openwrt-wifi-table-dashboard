@@ -18,7 +18,7 @@ clients with signal quality, radios and router load. A sidebar panel and a Lovel
   dopasowane po MAC (z obszarem) → komentarz/hostname z DHCP (OpenWrt lub **MikroTik REST**) → MAC.
 - **Edycja nazw w dashboardzie:** ołówek przy nazwie → wpisz → Enter (✓). ↺ przywraca nazwę automatyczną,
   Esc anuluje. Nazwy zapisywane trwale w HA (przetrwają restart).
-- **Porty:** LAN/WAN z etykietami z `board.json` — link, prędkość, duplex (swconfig i DSA); encje `Port LANx`.
+- **Porty:** grafika panelu routera — gniazda RJ45 z etykietami z `board.json`: zielone z wtyczką i prędkością, gdy jest link, szare gdy brak, pomarańczowe przy half duplex / < 100 Mb/s / błędach (swconfig i DSA); encje `Port LANx`.
 - **Sterowanie** (tylko administratorzy, z potwierdzeniem w karcie): wybór kanału radia (zapis trwały w
   `/etc/config/wireless`), restart Wi-Fi, restart routera, rozłączenie klienta. Ostrzeżenie, gdy radio działa
   w innym trybie niż ustawiony (np. HT40 → HT20).

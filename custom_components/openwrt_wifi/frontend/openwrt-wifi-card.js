@@ -1,7 +1,7 @@
 /* OpenWrt Wi-Fi Dashboard: karta Lovelace `custom:openwrt-wifi-card` + panel `openwrt-wifi-panel`.
  * Wszystko rysowane z atrybutow sensora "Klienci Wi-Fi" integracji openwrt_wifi - nowi klienci
  * i radia pojawiaja sie sami, bez edycji dashboardu. */
-const VERSION = "1.2.0";
+const VERSION = "1.3.0";
 const QUALITY = { "Bardzo dobry": "#4caf50", "Dobry": "#ffc107", "Słaby": "#ff9800", "Zły": "#f44336" };
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -70,10 +70,44 @@ const STYLE = `
   .btn { --mdc-icon-size: 20px; cursor: pointer; padding: 3px; border-radius: 50%; color: var(--secondary-text-color); }
   .btn:hover { background: var(--secondary-background-color); color: var(--primary-color); }
   .tag { font-size: .7em; padding: 0 5px; border-radius: 4px; background: var(--secondary-background-color); color: var(--secondary-text-color); margin-left: 4px; }
-  .ports { display: flex; flex-wrap: wrap; gap: 6px; }
-  .port { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px;
-          background: var(--secondary-background-color); font-size: .85em; }
-  .port.down { opacity: .55; }
+  .faceplate { display: flex; align-items: flex-start; gap: 14px; padding: 10px 16px 8px; border-radius: 12px; overflow-x: auto;
+               background: linear-gradient(180deg, #3b4048 0%, #262a30 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 1px 3px rgba(0,0,0,.25); }
+  .pgroup { display: flex; gap: 10px; }
+  .psep { width: 1px; align-self: stretch; background: rgba(255,255,255,.14); }
+  .model { margin-left: auto; align-self: center; color: rgba(255,255,255,.45); font-size: .72em; letter-spacing: .06em; text-align: right; max-width: 140px; }
+  .pt { display: flex; flex-direction: column; align-items: center; width: 70px; flex: none; text-align: center; }
+  .pt .extra { font-size: .62em; color: #ffb74d; line-height: 1.2; min-height: 1.2em; }
+  .pt .lbl { font-size: .7em; font-weight: 600; letter-spacing: .06em; color: #d5d9de; margin-bottom: 3px; }
+  .pt .lbl.wan { color: #64b5f6; }
+  .pt .jack { width: 48px; height: 66px; display: block; }
+  .pt .spd { font-size: .72em; margin-top: 2px; white-space: nowrap; font-weight: 500; }
+  .jack .body { fill: #1b1e22; stroke: #4a5059; stroke-width: 1.2; }
+  .jack .hole { fill: #07080a; stroke: #3a3f46; stroke-width: 1; }
+  .jack .pin { fill: #5a5f66; }
+  .jack .led, .jack .led2 { fill: #3a3f46; }
+  .jack .plug { fill: #c9d1d9; fill-opacity: .9; }
+  .jack .cable { fill: #9aa4ae; }
+  .pt.up .led { fill: #4caf50; filter: drop-shadow(0 0 3px #4caf50); animation: owled 2.4s ease-in-out infinite; }
+  .pt.up .led2 { fill: #ffb300; filter: drop-shadow(0 0 2px #ffb300); }
+  .pt.up .pin, .pt.warn .pin { fill: #d4a017; }
+  .pt.up .hole { stroke: #4caf50; }
+  .pt.up .spd { color: #81c784; }
+  .pt.up .cable { fill: #4caf50; }
+  .pt.warn .led { fill: #ff9800; filter: drop-shadow(0 0 3px #ff9800); }
+  .pt.warn .hole { stroke: #ff9800; }
+  .pt.warn .spd { color: #ffb74d; }
+  .pt.warn .cable { fill: #ff9800; }
+  .pt.down .spd { color: #8a9099; }
+  .pt.down .jack { opacity: .75; }
+  @media (max-width: 640px) {
+    .faceplate { gap: 8px; padding: 8px 10px 6px; }
+    .pgroup { gap: 4px; }
+    .pt { width: 54px; }
+    .pt .jack { width: 38px; height: 52px; }
+    .model { display: none; }
+  }
+  @keyframes owled { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+  @media (prefers-reduced-motion: reduce) { .pt.up .led { animation: none; } }
   .ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .ctl button, .confirm button { font: inherit; font-size: .85em; cursor: pointer; border-radius: 8px; padding: 6px 12px;
           border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color);
@@ -241,13 +275,34 @@ class OpenWrtWifiCard extends HTMLElement {
   _ports(a) {
     const ports = a.ports || [];
     if (!ports.length) return "";
-    return `<h3><ha-icon icon="mdi:ethernet"></ha-icon>Porty</h3><div class="ports">${ports.map((p) => {
-      const half = p.link && p.duplex === "half";
-      const col = !p.link ? "var(--disabled-text-color, #9e9e9e)" : half || (p.speed && p.speed < 100) ? "#ff9800" : "#4caf50";
-      const info = p.link ? `${p.speed ? (p.speed >= 1000 ? p.speed / 1000 + " Gb/s" : p.speed + " Mb/s") : "link"}${half ? " · half" : ""}` : "brak linku";
-      return `<span class="port ${p.link ? "" : "down"}" title="${esc(p.label)}${p.errors ? " · błędy: " + p.errors : ""}">
-        <span class="dot" style="background:${col}"></span><b>${esc(p.label)}</b> ${info}${p.errors ? ` <span class="bad">⚠ ${p.errors}</span>` : ""}</span>`;
-    }).join("")}</div>`;
+    const r = a.router || {};
+    const wan = ports.filter((p) => p.label.startsWith("WAN")), lan = ports.filter((p) => !p.label.startsWith("WAN"));
+    const speedTxt = (p) => (!p.link ? "—" : !p.speed ? "link" : p.speed >= 1000 ? `${p.speed / 1000} Gb/s` : `${p.speed} Mb/s`);
+    const jack = (p) => {
+      const warn = p.link && (p.duplex === "half" || (p.speed && p.speed < 100));
+      const state = !p.link ? "down" : warn ? "warn" : "up";
+      const title = `${p.label}: ${p.link ? `połączony, ${speedTxt(p)}${p.duplex ? ", " + p.duplex + " duplex" : ""}` : "brak linku"}${p.errors ? `, błędy: ${p.errors}` : ""}`;
+      const pins = Array.from({ length: 8 }, (_, i) => `<rect x="${12.5 + i * 3}" y="12" width="1.6" height="5" class="pin"/>`).join("");
+      // gniazdo RJ45 + (gdy jest link) wtyczka z kablem
+      return `<div class="pt ${state}" title="${esc(title)}">
+        <div class="lbl ${p.label.startsWith("WAN") ? "wan" : ""}">${esc(p.label)}</div>
+        <svg viewBox="0 0 48 66" class="jack" aria-hidden="true">
+          <rect x="1" y="1" width="46" height="42" rx="4" class="body"/>
+          <circle cx="7" cy="6" r="2.4" class="led"/><circle cx="41" cy="6" r="2.4" class="led2"/>
+          <path d="M9 10 H39 V30 H33 V37 H15 V30 H9 Z" class="hole"/>${pins}
+          ${p.link ? `<path d="M11 15 H37 V31 H32 V36 H16 V31 H11 Z" class="plug"/><rect x="21" y="36" width="6" height="30" rx="2" class="cable"/>` : ""}
+        </svg>
+        <div class="spd">${speedTxt(p)}</div>
+        <div class="extra">${[p.link && p.duplex === "half" ? "half" : "", p.errors ? `⚠ ${p.errors}` : ""].filter(Boolean).join(" ") || "&nbsp;"}</div>
+      </div>`;
+    };
+    const up = ports.filter((p) => p.link).length;
+    return `<h3><ha-icon icon="mdi:ethernet"></ha-icon>Porty <span class="muted">(${up}/${ports.length} podłączone)</span></h3>
+      <div class="faceplate">
+        ${wan.length ? `<div class="pgroup">${wan.map(jack).join("")}</div><div class="psep"></div>` : ""}
+        <div class="pgroup">${lan.map(jack).join("")}</div>
+        <div class="model">${esc(r.model || "")}</div>
+      </div>`;
   }
 
   _controls(a) {
