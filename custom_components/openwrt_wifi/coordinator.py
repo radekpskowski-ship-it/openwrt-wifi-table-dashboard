@@ -63,7 +63,8 @@ class OpenWrtWifiCoordinator(DataUpdateCoordinator[dict]):
         self._board = raw["board"]
         if raw.get("mikrotik_error"):
             _LOGGER.debug("Dzierzawy MikroTika niedostepne: %s", raw["mikrotik_error"])
-        data, self._prev, new_macs = build(raw, self._prev, self._seen, self._ha_names(), self._watched(), time.time())
+        data, self._prev, new_macs = build(raw, self._prev, self._seen, self._ha_names(), self._watched(), time.time(),
+                                           self._seen.get("names"))
         self._store.async_delay_save(lambda: self._seen, 60)
         for mac in new_macs:
             c = next(c for c in data["clients"] if c["mac"] == mac)
@@ -72,6 +73,20 @@ class OpenWrtWifiCoordinator(DataUpdateCoordinator[dict]):
                 "mac": mac, "name": c["name"], "ip": c["ip"], "signal": c["signal"], "ssid": c["ssid"],
             })
         return data
+
+    async def async_set_client_name(self, mac: str, name: str | None) -> None:
+        """Reczna nazwa klienta (pusta = powrot do nazwy automatycznej)."""
+        mac = mac.strip().lower().replace("-", ":")
+        if not MAC_RE.match(mac):
+            raise ValueError(f"Niepoprawny MAC: {mac}")
+        names = self._seen.setdefault("names", {})
+        name = (name or "").strip()[:64]
+        if name:
+            names[mac] = name
+        else:
+            names.pop(mac, None)
+        await self._store.async_save(self._seen)
+        await self.async_refresh()
 
     def _ha_names(self) -> dict[str, tuple[str, str | None]]:
         """MAC -> (nazwa, obszar) z rejestru urzadzen HA; pomija trackery i nazwy-MAC."""

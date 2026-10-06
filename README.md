@@ -14,8 +14,10 @@ clients with signal quality, radios and router load. A sidebar panel and a Lovel
 - **Radia:** SSID, pasmo, kanał/HT, moc, szum, zajętość kanału, TX retries, liczba klientów.
 - **Klienci:** sygnał (bieżący i średni), SNR, jakość, retry %, prędkość TX/RX, MCS, bieżący transfer,
   czas bezczynności i połączenia. Ikona typu urządzenia, sortowanie po kliknięciu nagłówka.
-- **Nazwy klientów** (w tej kolejności): urządzenie z HA dopasowane po MAC (z obszarem) →
-  komentarz/hostname z DHCP (OpenWrt lub **MikroTik REST**) → MAC.
+- **Nazwy klientów** (w tej kolejności): **nazwa wpisana ręcznie w dashboardzie** → urządzenie z HA
+  dopasowane po MAC (z obszarem) → komentarz/hostname z DHCP (OpenWrt lub **MikroTik REST**) → MAC.
+- **Edycja nazw w dashboardzie:** ołówek przy nazwie → wpisz → Enter (✓). ↺ przywraca nazwę automatyczną,
+  Esc anuluje. Nazwy zapisywane trwale w HA (przetrwają restart).
 - **Alerty:** nowe urządzenie (24 h) i zdarzenie `openwrt_wifi_new_client`; brak w sieci urządzeń HA
   z etykietą `wifi-krytyczne`.
 - Wszystko **dynamiczne** — nowi klienci i zmiany nazw pojawiają się przy następnym odczycie.
@@ -56,6 +58,7 @@ entity: sensor.<nazwa>_klienci_wi_fi   # opcjonalnie; bez tego karta znajdzie se
 # entry_id: <id wpisu>                  # alternatywnie wybór routera po wpisie
 # title: Wi-Fi                          # własny tytuł
 # sections: [router, alerts, radios, clients]
+# editable: false                      # ukryj ołówek edycji nazw
 ```
 
 Najlepiej wygląda w widoku typu **Panel (pojedyncza karta)**.
@@ -66,6 +69,20 @@ Najlepiej wygląda w widoku typu **Panel (pojedyncza karta)**.
 - Router: CPU, Load 1m, Pamięć, LAN RX/TX, WAN RX/TX (jeśli jest WAN), Ostatni start, Firmware.
 - Per radio: klienci, zajętość kanału, szum, TX retries.
 - Opcjonalnie: `Sygnał <klient>` dla każdego klienta (dodawane dynamicznie).
+
+## Usługa `openwrt_wifi.set_client_name`
+
+Ustawia ręczną nazwę klienta (to samo, co ołówek w dashboardzie). Pusta nazwa = powrót do automatycznej.
+
+```yaml
+action: openwrt_wifi.set_client_name
+data:
+  mac: "24:9e:7d:d6:c5:be"
+  name: Odkurzacz
+  # entry_id: <id wpisu>   # opcjonalnie; bez tego dla wszystkich routerów
+```
+
+W karcie edycję można wyłączyć opcją `editable: false`.
 
 ## Automatyzacja: powiadomienie o nowym urządzeniu
 

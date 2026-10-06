@@ -1,7 +1,7 @@
 /* OpenWrt Wi-Fi Dashboard: karta Lovelace `custom:openwrt-wifi-card` + panel `openwrt-wifi-panel`.
  * Wszystko rysowane z atrybutow sensora "Klienci Wi-Fi" integracji openwrt_wifi - nowi klienci
  * i radia pojawiaja sie sami, bez edycji dashboardu. */
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const QUALITY = { "Bardzo dobry": "#4caf50", "Dobry": "#ffc107", "Słaby": "#ff9800", "Zły": "#f44336" };
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -61,6 +61,15 @@ const STYLE = `
   .sig ha-icon { --mdc-icon-size: 18px; }
   .bar { height: 4px; border-radius: 2px; background: var(--divider-color); margin-top: 3px; min-width: 50px; }
   .bar i { display: block; height: 100%; border-radius: 2px; }
+  .edit { --mdc-icon-size: 16px; opacity: .35; cursor: pointer; margin-left: 4px; vertical-align: middle; }
+  .edit:hover, tr:hover .edit { opacity: .9; }
+  .editor { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .editor input { flex: 1; min-width: 120px; font: inherit; padding: 4px 8px; border-radius: 6px;
+                  border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); }
+  .editor input:focus { outline: 2px solid var(--primary-color); border-color: transparent; }
+  .btn { --mdc-icon-size: 20px; cursor: pointer; padding: 3px; border-radius: 50%; color: var(--secondary-text-color); }
+  .btn:hover { background: var(--secondary-background-color); color: var(--primary-color); }
+  .tag { font-size: .7em; padding: 0 5px; border-radius: 4px; background: var(--secondary-background-color); color: var(--secondary-text-color); margin-left: 4px; }
   .foot { margin-top: 10px; color: var(--secondary-text-color); font-size: .75em; }
   .empty { padding: 16px; text-align: center; color: var(--secondary-text-color); }
   @media (max-width: 640px) { .opt { display: none; } ha-card { padding: 12px; } }
@@ -81,7 +90,11 @@ class OpenWrtWifiCard extends HTMLElement {
     const id = findEntity(hass, this._config || {});
     const st = id ? hass.states[id] : null;
     const key = st ? `${id}|${st.last_updated}|${st.attributes.updated}` : "none";
-    if (key !== this._key) { this._key = key; this._render(); }
+    if (key !== this._key) {
+      this._key = key;
+      if (this._editing) this._dirty = true; // nie zamazuj pola edycji w trakcie pisania
+      else this._render();
+    }
   }
 
   getCardSize() { return 10; }
@@ -92,8 +105,18 @@ class OpenWrtWifiCard extends HTMLElement {
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
       this.shadowRoot.addEventListener("click", (ev) => {
-        const th = ev.composedPath().find((el) => el.dataset && el.dataset.sort);
-        if (th) { this._sort = th.dataset.sort === this._sort ? `-${this._sort}` : th.dataset.sort; this._key = null; this._render(); }
+        const el = ev.composedPath().find((x) => x.dataset && (x.dataset.sort || x.dataset.act));
+        if (!el) return;
+        if (el.dataset.sort) {
+          if (this._editing) return;
+          this._sort = el.dataset.sort === this._sort ? `-${this._sort}` : el.dataset.sort;
+          this._render();
+        } else this._action(el.dataset.act, el.dataset.mac);
+      });
+      this.shadowRoot.addEventListener("keydown", (ev) => {
+        if (!this._editing || ev.target.tagName !== "INPUT") return;
+        if (ev.key === "Enter") { ev.preventDefault(); this._action("save", this._editing); }
+        if (ev.key === "Escape") { ev.preventDefault(); this._action("cancel", this._editing); }
       });
     }
     const id = findEntity(this._hass, this._config);
@@ -114,9 +137,48 @@ class OpenWrtWifiCard extends HTMLElement {
       ${show.has("radios") ? this._radios(a) : ""}
       ${show.has("clients") ? this._clients(a) : ""}
       <div class="foot">Sygnał: <span class="ok">≥ -55</span> · <span style="color:#ffc107">-56…-67</span> · <span class="warn">-68…-75</span> · <span class="bad">&lt; -75 dBm</span>
-        · Retry = % retransmisji TX od ostatniego odczytu · ❔ = brak urządzenia w HA ·
+        · Retry = % retransmisji TX od ostatniego odczytu · ❔ = brak urządzenia w HA · ✏️ = zmień nazwę ·
         odświeżono ${Math.max(0, Math.round(Date.now() / 1000 - (a.updated || 0)))} s temu · v${VERSION}</div>
     </ha-card>`;
+  }
+
+  _action(act, mac) {
+    if (act === "edit") {
+      this._editing = mac;
+      this._render();
+      const inp = this.shadowRoot.querySelector(".editor input");
+      if (inp) { inp.focus(); inp.select(); }
+      return;
+    }
+    if (act === "save" || act === "reset") {
+      const inp = this.shadowRoot.querySelector(".editor input");
+      const name = act === "reset" ? "" : (inp ? inp.value.trim() : "");
+      const id = findEntity(this._hass, this._config);
+      const entry_id = id && this._hass.states[id].attributes.entry_id;
+      this._hass.callService("openwrt_wifi", "set_client_name", { entry_id, mac, name }).catch((err) => {
+        // eslint-disable-next-line no-alert
+        alert(`Nie udało się zapisać nazwy: ${err.message || err}`);
+      });
+    }
+    this._editing = null;
+    this._dirty = false;
+    this._render();
+  }
+
+  _nameCell(c) {
+    const editable = this._config.editable !== false;
+    if (editable && this._editing === c.mac) {
+      return `<div class="editor"><input value="${esc(c.custom ? c.name : c.auto_name || c.name)}" maxlength="64" placeholder="${esc(c.auto_name)}">
+        <ha-icon class="btn" icon="mdi:check" title="Zapisz (Enter)" data-act="save" data-mac="${esc(c.mac)}"></ha-icon>
+        ${c.custom ? `<ha-icon class="btn" icon="mdi:backup-restore" title="Przywróć automatyczną: ${esc(c.auto_name)}" data-act="reset" data-mac="${esc(c.mac)}"></ha-icon>` : ""}
+        <ha-icon class="btn" icon="mdi:close" title="Anuluj (Esc)" data-act="cancel" data-mac="${esc(c.mac)}"></ha-icon></div>
+        <small>${esc(c.mac)}${c.custom ? " · automatycznie: " + esc(c.auto_name) : ""}</small>`;
+    }
+    const sub = [c.area, (c.in_ha || c.custom) && c.host && c.host !== c.name ? c.host : null, c.ip, c.random_mac ? "prywatny MAC" : null]
+      .filter(Boolean).map(esc).join(" · ");
+    const pencil = editable ? `<ha-icon class="edit" icon="mdi:pencil" title="Zmień nazwę" data-act="edit" data-mac="${esc(c.mac)}"></ha-icon>` : "";
+    return `<b>${esc(c.name)}</b>${c.custom ? '<span class="tag" title="Nazwa ustawiona ręcznie">ręcznie</span>' : c.in_ha ? "" : " ❔"}${pencil}
+      <br><small>${sub || esc(c.mac)}</small>`;
   }
 
   _router(a) {
@@ -174,10 +236,8 @@ class OpenWrtWifiCard extends HTMLElement {
     const arrow = (k) => (key === k ? (dir > 0 ? " ▾" : " ▴") : "");
     const rows = list.map((c) => {
       const lvl = sigLevel(c.signal ?? -100), col = QUALITY[c.q] || "#9aa0a6";
-      const sub = [c.area, c.in_ha && c.host && c.host !== c.name ? c.host : null, c.ip, c.random_mac ? "prywatny MAC" : null].filter(Boolean).map(esc).join(" · ");
       return `<tr>
-        <td><div class="name"><ha-icon icon="${esc(c.icon)}" style="color:${esc(c.color)}"></ha-icon><div>
-          <b>${esc(c.name)}</b>${c.in_ha ? "" : " ❔"}<br><small>${sub || esc(c.mac)}</small></div></div></td>
+        <td><div class="name"><ha-icon icon="${esc(c.icon)}" style="color:${esc(c.color)}"></ha-icon><div style="flex:1">${this._nameCell(c)}</div></div></td>
         <td class="c opt">${esc(c.band)}<br><small>${esc(c.ssid || "")}</small></td>
         <td class="c"><span class="sig" style="color:${col}"><ha-icon icon="mdi:wifi-strength-${lvl}"></ha-icon>${num(c.signal)}</span><br><small>śr. ${num(c.signal_avg)} · SNR ${num(c.snr)}</small></td>
         <td class="c"><span class="${tone(c.retry, 10, 20)}">${num(c.retry, 1)} %</span></td>

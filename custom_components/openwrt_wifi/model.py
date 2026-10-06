@@ -93,12 +93,14 @@ def _is_random_mac(mac: str) -> bool:
     return len(mac) > 1 and mac[1] in "26ae"
 
 
-def build(raw: dict, prev: dict, seen: dict, ha_names: dict, watch: list, now: float) -> tuple[dict, dict, list]:
+def build(raw: dict, prev: dict, seen: dict, ha_names: dict, watch: list, now: float,
+          custom_names: dict | None = None) -> tuple[dict, dict, list]:
     """Zwraca (dane dla encji/karty, stan do nastepnego przebiegu, nowo wykryte MAC-i).
 
     prev  - liczniki z poprzedniego przebiegu (CPU, bajty, retries) do liczenia predkosci
     seen  - trwaly stan {"first": {mac: ts}, "last": {mac: ts}, "baseline": bool}
     ha_names - MAC -> (nazwa, obszar) z rejestru urzadzen HA
+    custom_names - MAC -> nazwa wpisana recznie w dashboardzie (najwyzszy priorytet)
     watch - [(mac, nazwa, obszar)] urzadzen HA z etykieta "krytyczne"
     """
     dt = now - prev["ts"] if prev.get("ts") else None
@@ -207,16 +209,18 @@ def build(raw: dict, prev: dict, seen: dict, ha_names: dict, watch: list, now: f
             lease = lease_by_mac.get(mac, {})
             ha_name, area = ha_names.get(mac, (None, None))
             host = lease.get("host")
-            name = ha_name or lease.get("comment") or host or mac
+            manual = (custom_names or {}).get(mac)
+            auto_name = ha_name or lease.get("comment") or host or mac
             sig = a.get("signal")
-            ico = icon_for(" ".join(str(x) for x in (ha_name, lease.get("comment"), host) if x))
+            ico = icon_for(" ".join(str(x) for x in (manual, ha_name, lease.get("comment"), host) if x))
             if mac not in first:
                 first[mac] = 0 if baseline else now
                 if not baseline:
                     new_macs.append(mac)
             last[mac] = now
             clients.append({
-                "name": name, "host": host, "in_ha": ha_name is not None, "area": area,
+                "name": manual or auto_name, "auto_name": auto_name, "custom": manual is not None,
+                "host": host, "in_ha": ha_name is not None, "area": area,
                 "icon": ico, "color": ICON_COLORS.get(ico, "#9aa0a6"),
                 "mac": mac, "random_mac": _is_random_mac(mac),
                 "ip": lease.get("ip") or arp.get(mac),

@@ -1,7 +1,7 @@
 """Stale integracji OpenWrt Wi-Fi Dashboard."""
 
 DOMAIN = "openwrt_wifi"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 CONF_SSL = "ssl"
 CONF_SCAN_INTERVAL = "scan_interval"
@@ -43,7 +43,7 @@ ICON_RULES = [
     (r"nest|echo|głośnik|glosnik|speaker|sonos", "mdi:speaker"),
     (r"webos|android ?tv|fire ?tv|\btv\b|chromecast|bravia", "mdi:television"),
     (r"thingino|kamera|camera|cam\b|c310|chuangmi|ipc|hikvision|dahua|tapo_c", "mdi:cctv"),
-    (r"roborock|vacuum|odkurz|dreame|xiaomi_v", "mdi:robot-vacuum"),
+    (r"roborock|robot|vacuum|odkurz|dreame|xiaomi_v", "mdi:robot-vacuum"),
     (r"iphone|pixel|galaxy|phone|telefon|sm-|nokia|redmi|oneplus", "mdi:cellphone"),
     (r"ipad|tablet", "mdi:tablet"),
     (r"laptop|dell|lenovo|thinkpad|macbook|desktop-|\bpc\b", "mdi:laptop"),

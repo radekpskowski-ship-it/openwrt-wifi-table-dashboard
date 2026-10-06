@@ -102,5 +102,25 @@
         "name": "{radio} TX retries"
       }
     }
+  },
+  "services": {
+    "set_client_name": {
+      "name": "Ustaw nazwę klienta",
+      "description": "Ręczna nazwa klienta Wi-Fi w dashboardzie. Pusta nazwa przywraca nazwę automatyczną.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Wpis integracji; puste = wszystkie routery."
+        },
+        "mac": {
+          "name": "MAC",
+          "description": "Adres MAC klienta."
+        },
+        "name": {
+          "name": "Nazwa",
+          "description": "Nowa nazwa (puste = automatyczna)."
+        }
+      }
+    }
   }
 }

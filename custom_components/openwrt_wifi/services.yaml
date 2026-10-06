@@ -1,0 +1,17 @@
+set_client_name:
+  fields:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: openwrt_wifi
+    mac:
+      required: true
+      example: "24:9e:7d:d6:c5:be"
+      selector:
+        text:
+    name:
+      required: false
+      example: "Odkurzacz salon"
+      selector:
+        text:

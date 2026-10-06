@@ -3,10 +3,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import voluptuous as vol
+
 from homeassistant.components import frontend
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
@@ -16,6 +20,12 @@ from .coordinator import OpenWrtWifiConfigEntry, OpenWrtWifiCoordinator
 PLATFORMS = [Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 MODULE_URL = f"{CARD_URL}?v={VERSION}"
+SERVICE_SET_NAME = "set_client_name"
+SET_NAME_SCHEMA = vol.Schema({
+    vol.Optional("entry_id"): cv.string,
+    vol.Required("mac"): vol.All(cv.string, vol.Match(r"^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$", msg="niepoprawny MAC")),
+    vol.Optional("name", default=""): cv.string,
+})
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -24,6 +34,20 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         StaticPathConfig(CARD_URL, str(Path(__file__).parent / "frontend" / "openwrt-wifi-card.js"), False)
     ])
     frontend.add_extra_js_url(hass, MODULE_URL)
+
+    async def _set_name(call: ServiceCall) -> None:
+        entry_id = call.data.get("entry_id")
+        entries = [e for e in hass.config_entries.async_entries(DOMAIN)
+                   if e.state is ConfigEntryState.LOADED and (not entry_id or e.entry_id == entry_id)]
+        if not entries:
+            raise ServiceValidationError(f"Brak aktywnego routera {entry_id or ''}".strip())
+        for entry in entries:
+            try:
+                await entry.runtime_data.async_set_client_name(call.data["mac"], call.data["name"])
+            except ValueError as err:
+                raise ServiceValidationError(str(err)) from err
+
+    hass.services.async_register(DOMAIN, SERVICE_SET_NAME, _set_name, schema=SET_NAME_SCHEMA)
     return True
 
 

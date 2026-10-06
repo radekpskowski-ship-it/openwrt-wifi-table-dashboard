@@ -102,5 +102,25 @@
         "name": "{radio} TX retries"
       }
     }
+  },
+  "services": {
+    "set_client_name": {
+      "name": "Set client name",
+      "description": "Manual Wi-Fi client name shown in the dashboard. Empty name restores the automatic one.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Integration entry; empty = all routers."
+        },
+        "mac": {
+          "name": "MAC",
+          "description": "Client MAC address."
+        },
+        "name": {
+          "name": "Name",
+          "description": "New name (empty = automatic)."
+        }
+      }
+    }
   }
 }
