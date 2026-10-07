@@ -32,7 +32,8 @@ clients with signal quality, radios and router load. A sidebar panel and a Lovel
 2. Wyszukaj **OpenWrt Wi-Fi Dashboard** → Pobierz → zrestartuj Home Assistant.
 3. Ustawienia → Urządzenia i usługi → **Dodaj integrację** → *OpenWrt Wi-Fi Dashboard*.
 
-Ręcznie: skopiuj `custom_components/openwrt_wifi` do `/config/custom_components/` i zrestartuj HA.
+Ręcznie: pobierz `openwrt_wifi.zip` z ostatniego [release'u](../../releases/latest) i rozpakuj do
+`/config/custom_components/openwrt_wifi/` (albo skopiuj `custom_components/openwrt_wifi` z repo) i zrestartuj HA.
 
 ## Wymagania po stronie OpenWrt
 
